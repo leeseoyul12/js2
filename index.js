@@ -17,3 +17,9 @@ app.get('/asdf', (req, res) => {
 
 
 
+app.get('abc', (req, res) => {
+    res.send('가나다다');
+  });
+
+
+
