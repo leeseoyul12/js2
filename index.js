@@ -199,7 +199,7 @@ app.get('abc', (req, res) => {
 
 
 
-  app.get('/users', (req, res) => {
+  app.get('/articles', (req, res) => {
     res.json(users);
   });
 
