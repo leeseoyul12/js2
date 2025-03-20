@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>게시판</title>
+    <style>
+        /* 기본 스타일 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f7;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        header {
+            background-color: #1d1d1f;
+            color: white;
+            text-align: center;
+            padding: 40px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 3em;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 게시글 작성 폼 */
+        .post-form {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 40px;
+        }
+
+        .post-form input, .post-form textarea {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+            background-color: #f7f7f7;
+            color: #333;
+            transition: border-color 0.3s ease;
+        }
+
+        .post-form input:focus, .post-form textarea:focus {
+            border-color: #0071e3;
+            outline: none;
+        }
+
+        .post-form button {
+            padding: 15px;
+            background-color: #0071e3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.3s ease;
+        }
+
+        .post-form button:hover {
+            background-color: #005bb5;
+        }
+
+        /* 게시글 리스트 */
+        .article-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .article-list li {
+            padding: 20px;
+            border-bottom: 1px solid #f0f0f5;
+            display: flex;
+            flex-direction: column;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .article-list li:hover {
+            background-color: #f1f1f4;
+        }
+
+        .article-list li h3 {
+            font-size: 1.5em;
+            font-weight: 500;
+            margin: 0;
+            color: #333;
+        }
+
+        .article-list li p {
+            font-size: 16px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .article-list li .author {
+            font-size: 14px;
+            color: #999;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        /* 로딩 메시지 */
+        .loading {
+            text-align: center;
+            color: #0071e3;
+            font-size: 18px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>게시판</h1>
+</header>
+
+<div class="container">
+
+    <!-- 게시글 작성 폼 -->
+    <div class="post-form">
+        <input type="text" id="title" placeholder="제목을 입력하세요" required>
+        <textarea id="content" rows="4" placeholder="내용을 입력하세요" required></textarea>
+        <button onclick="createArticle()">게시글 작성</button>
+    </div>
+
+    <!-- 게시글 리스트 -->
+    <div class="loading" id="loading">게시글을 불러오는 중...</div>
+    <ul class="article-list" id="articleList">
+        <!-- 게시글들이 여기에 추가됩니다 -->
+    </ul>
+
+</div>
+
+<script>
+    const apiUrl = 'http://localhost:3000';
+
+    // 게시글 리스트 불러오기
+    async function fetchArticles() {
+        const response = await fetch(`${apiUrl}/articles`);
+        const articles = await response.json();
+        const articleList = document.getElementById('articleList');
+        articleList.innerHTML = ''; // 기존 목록 지우기
+
+        if (articles.length === 0) {
+            document.getElementById('loading').innerText = '게시글이 없습니다.';
+        } else {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        articles.forEach(article => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <h3>${article.title}</h3>
+                <p>${article.content}</p>
+                <div class="author">작성자: ${article.name || '알 수 없음'} | ${new Date(article.date).toLocaleString()}</div>
+            `;
+            articleList.appendChild(li);
+        });
+    }
+
+    // 게시글 작성
+    async function createArticle() {
+        const title = document.getElementById('title').value;
+        const content = document.getElementById('content').value;
+
+        if (!title || !content) {
+            alert('제목과 내용을 모두 입력해주세요.');
+            return;
+        }
+
+        const newArticle = {
+            title: title,
+            content: content,
+            author_id: 1,  // 예시로 1번 유저가 작성한 것으로 설정
+            date: new Date().toISOString(),
+        };
+
+        const response = await fetch(`${apiUrl}/articles`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newArticle),
+        });
+
+        if (response.ok) {
+            fetchArticles();  // 새로 작성된 게시글을 포함한 리스트를 다시 불러옵니다.
+            document.getElementById('title').value = '';
+            document.getElementById('content').value = '';
+        } else {
+            alert('게시글 작성에 실패했습니다.');
+        }
+    }
+
+    // 페이지 로드 시 게시글 리스트 불러오기
+    window.onload = fetchArticles;
+
+</script>
+
+</body>
+</html>
