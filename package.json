@@ -10,8 +10,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+<<<<<<< HEAD
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "sqlite3": "^5.1.7"
+=======
+    "express": "^4.21.2"
+>>>>>>> d414f94782d6bb4bc6d41079f8c411df6adcb5ab
   }
 }
