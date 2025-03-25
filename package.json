@@ -10,12 +10,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-<<<<<<< HEAD
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemon": "^3.1.9",
     "sqlite3": "^5.1.7"
-=======
-    "express": "^4.21.2"
->>>>>>> d414f94782d6bb4bc6d41079f8c411df6adcb5ab
   }
 }

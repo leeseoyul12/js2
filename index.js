@@ -1,12 +1,13 @@
 const express = require('express');
 const app = express();
-HEAD
 // cors 문제해결
 const cors = require('cors');
 app.use(cors());
 // json으로 된 post의 바디를 읽기 위해 필요
 app.use(express.json())
-
+const jwt = require('jsonwebtoken');
+const SECRET_KEY = "your_secret_key"; // 실제 서비스에선 더 복잡하고 안전하게!
+const PORT = 3000;
 
 //db 연결
 const sqlite3 = require('sqlite3').verbose();
@@ -17,19 +18,34 @@ app.listen(PORT, () => {
     console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
   });
   
-app.post("/articles", (req, res)=>{
-
-    let {title, content} = req.body
-
-    db.run(`INSERT INTO articles (title, content) VALUES (?, ?)`,
-    [title, content],
-    function(err) {
+  app.post("/articles", (req, res) => {
+    // 토큰 확인
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: "인증 토큰이 필요합니다." });
+    }
+  
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, SECRET_KEY, (err, decoded) => {
       if (err) {
-        return res.status(500).json({error: err.message});
+        return res.status(401).json({ error: "유효하지 않은 토큰입니다." });
       }
-      res.json({id: this.lastID, title, content});
+  
+      // 인증 성공 -> 게시글 작성 처리
+      const { title, content } = req.body;
+  
+      db.run(
+        `INSERT INTO articles (title, content) VALUES (?, ?)`,
+        [title, content],
+        function (err) {
+          if (err) {
+            return res.status(500).json({ error: err.message });
+          }
+          res.json({ id: this.lastID, title, content });
+        }
+      );
     });
-})
+  });
 
 // 커밋 한번해주세요
 
@@ -103,8 +119,6 @@ app.put('/articles/:id', (req, res)=>{
 
 
 
-
-
 app.get('/gettest/:id', (req, res)=>{
 
   console.log(req.query)
@@ -121,282 +135,123 @@ app.post('/posttest', (req, res)=>{
 })
 
 
-
-
-
-
-
-
+// POST /articles/:id/comments 라우트
 app.post("/articles/:id/comments", (req, res) => {
-    let articleId = req.params.id;  // URL에서 받은 게시글 id
-    let content = req.body.content;  // 댓글 내용
+  const articleId = req.params.id;
+  const content = req.body.content;
   
+  // 현재 날짜/시간을 ISO 문자열 형태로 생성
+  const createdAt = new Date().toISOString();
 
+  // comments 테이블에 INSERT 쿼리 실행
+  const sql = `INSERT INTO comments (content, created_at, article_id) VALUES (?, ?, ?)`;
+  db.run(sql, [content, createdAt, articleId], function(err) {
+    if (err) {
+      console.error("댓글 삽입 중 에러 발생:", err);
+      return res.status(500).json({ error: "댓글을 등록하는데 실패했습니다." });
+    }
 
-
-    // 댓글 내용을 comments 테이블에 추가하는 SQL 쿼리
-    const sql = `
-      INSERT INTO comments (content, article_id)
-      VALUES (?, ?)
-    `;
-  
-    // SQL 실행
-    db.run(sql, [content, articleId], function (err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });  // 에러 발생 시 500 응답
-      }
-  
-      // 새로 추가된 댓글의 ID를 포함한 성공 응답
-      res.status(201).json({
-        message: 'Comment added successfully',
-        comment: {
-          id: this.lastID,  // 새로 생성된 댓글의 ID
-          content: content,
-          article_id: articleId
-        }
-      });
+    // 삽입된 댓글의 id는 this.lastID에 저장됨.
+    res.status(201).json({
+      id: this.lastID,
+      content: content,
+      created_at: createdAt,
+      article_id: articleId
     });
   });
-  
-
-
-
-
-
-
-
-
-  
-  app.get("/articles/:id/comments", (req, res) => {
-    const articleId = req.params.id;  // URL에서 받은 게시글 id
-  
-    // 해당 게시글에 대한 댓글을 조회하는 SQL 쿼리
-    const sql = `SELECT * FROM comments WHERE article_id = ?`;
-  
-    // 쿼리 실행
-    db.all(sql, [articleId], (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });  // 에러 발생 시 500 응답
-      }
-      if (rows.length === 0) {
-        return res.status(404).json({ message: "No comments found for this article" });  // 댓글이 없으면 404 응답
-      }
-  
-      // 댓글 목록 반환
-      res.json(rows);  // 해당 게시글에 대한 모든 댓글 반환
-    });
-  });
-  
-
-const PORT = 3000;
-
-
-
-
-
-const users =  [
-    {
-      "id": 1,
-      "name": "홍길동",
-      "email": "hong@example.com",
-      "signup_date": "2023-03-18T12:00:00Z"
-    },
-    {
-      "id": 2,
-      "name": "김철수",
-      "email": "kim@example.com",
-      "signup_date": "2023-02-17T09:30:00Z"
-    },
-    {
-      "id": 3,
-      "name": "이영희",
-      "email": "lee@example.com",
-      "signup_date": "2022-11-16T15:20:00Z"
-    },
-    {
-      "id": 4,
-      "name": "박준호",
-      "email": "park@example.com",
-      "signup_date": "2022-10-15T10:10:00Z"
-    },
-    {
-      "id": 5,
-      "name": "최민수",
-      "email": "choi@example.com",
-      "signup_date": "2022-09-14T18:45:00Z"
-    },
-    {
-      "id": 6,
-      "name": "정다은",
-      "email": "jung@example.com",
-      "signup_date": "2022-08-13T14:00:00Z"
-    },
-    {
-      "id": 7,
-      "name": "김지수",
-      "email": "kim2@example.com",
-      "signup_date": "2022-07-12T11:30:00Z"
-    },
-    {
-      "id": 8,
-      "name": "이수민",
-      "email": "lee2@example.com",
-      "signup_date": "2022-06-11T17:15:00Z"
-    },
-    {
-      "id": 9,
-      "name": "박지현",
-      "email": "park2@example.com",
-      "signup_date": "2022-05-10T08:40:00Z"
-    },
-    {
-      "id": 10,
-      "name": "최지우",
-      "email": "choi2@example.com",
-      "signup_date": "2022-04-09T20:00:00Z"
-    }
-  ]
-  
-  
-const articles = [
-    {
-      "id": 1,
-      "title": "첫 번째 게시글 제목",
-      "content": "첫 번째 게시글 내용입니다.",
-      "author_id": 1,
-      "date": "2025-03-18T12:00:00Z"
-    },
-    {
-      "id": 2,
-      "title": "두 번째 게시글 제목",
-      "content": "두 번째 게시글 내용입니다.",
-      "author_id": 2,
-      "date": "2025-03-17T09:30:00Z"
-    },
-    {
-      "id": 3,
-      "title": "세 번째 게시글 제목",
-      "content": "세 번째 게시글 내용입니다.",
-      "author_id": 3,
-      "date": "2025-03-16T15:20:00Z"
-    },
-    {
-      "id": 4,
-      "title": "네 번째 게시글 제목",
-      "content": "네 번째 게시글 내용입니다.",
-      "author_id": 4,
-      "date": "2025-03-15T10:10:00Z"
-    },
-    {
-      "id": 5,
-      "title": "다섯 번째 게시글 제목",
-      "content": "다섯 번째 게시글 내용입니다.",
-      "author_id": 5,
-      "date": "2025-03-14T18:45:00Z"
-    },
-    {
-      "id": 6,
-      "title": "여섯 번째 게시글 제목",
-      "content": "여섯 번째 게시글 내용입니다.",
-      "author_id": 6,
-      "date": "2025-03-13T14:00:00Z"
-    },
-    {
-      "id": 7,
-      "title": "일곱 번째 게시글 제목",
-      "content": "일곱 번째 게시글 내용입니다.",
-      "author_id": 7,
-      "date": "2025-03-12T11:30:00Z"
-    },
-    {
-      "id": 8,
-      "title": "여덟 번째 게시글 제목",
-      "content": "여덟 번째 게시글 내용입니다.",
-      "author_id": 8,
-      "date": "2025-03-11T17:15:00Z"
-    },
-    {
-      "id": 9,
-      "title": "아홉 번째 게시글 제목",
-      "content": "아홉 번째 게시글 내용입니다.",
-      "author_id": 9,
-      "date": "2025-03-10T08:40:00Z"
-    },
-    {
-      "id": 10,
-      "title": "열 번째 게시글 제목",
-      "content": "열 번째 게시글 내용입니다.",
-      "author_id": 10,
-      "date": "2025-03-09T20:00:00Z"
-    }
-  ]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-app.listen(PORT, () => {
-  console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
 });
 
 
-app.get('/ping', (req, res) => {
-    res.send('pong');
+
+const bcrypt = require('bcrypt');
+const saltRounds = 10; // 일반적으로 10이면 충분함
+
+app.post('/users', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).send("Email and password are required.");
+  }
+
+  // 비밀번호 해싱
+  bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
+    if (err) {
+      return res.status(500).send("Error hashing password");
+    }
+
+    const query = `INSERT INTO users (email, password) VALUES (?, ?)`;
+
+    db.run(query, [email, hashedPassword], function (err) {
+      if (err) {
+        if (err.message.includes("UNIQUE constraint failed")) {
+          return res.status(409).send("Email already exists.");
+        }
+        return res.status(500).send("Database error: " + err.message);
+      }
+
+      res.status(201).send({
+        id: this.lastID,
+        email,
+      });
+    });
   });
+});
 
-app.get('/tic', (req, res) => {
-    res.send('tactoe');
+app.post('/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).send("이메일과 패스워드를 입력해주세요");
+  }
+
+  const query = `SELECT * FROM users WHERE email = ?`;
+
+  db.get(query, [email], (err, user) => {
+    if (err) {
+      return res.status(500).send("DB 오류: " + err.message);
+    }
+
+    if (!user) {
+      return res.status(404).send("이메일이 없습니다");
+    }
+
+    // 비밀번호 비교
+    bcrypt.compare(password, user.password, (err, result) => {
+      if (err) {
+        return res.status(500).send("비밀번호 확인 중 오류 발생");
+      }
+
+      if (!result) {
+        return res.status(401).send("패스워드가 틀립니다");
+      }
+
+      // JWT 토큰 생성
+      const token = jwt.sign(
+        { id: user.id, email: user.email }, // payload
+        SECRET_KEY,                         // 비밀 키
+        { expiresIn: '1h' }                 // 옵션: 1시간 유효
+      );
+
+      // 성공 응답
+      res.send({
+        message: "로그인 성공!",
+        token: token
+      });
+    });
   });
+});
+
+app.get('/logintest', (req, res)=>{
+  console.log(req.headers.authorization.split(' ')[1])
+  let token = req.headers.authorization.split(' ')[1]
 
 
+  jwt.verify(token, SECRET_KEY, (err, decoded)=>{
+    if(err){
+      return res.send("에러!!!")
+    }
 
-app.get('/asdf', (req, res) => {
-    res.send('qwerty');
-  });
+    return res.send('로그인 성공!')
 
-
-
-app.get('abc', (req, res) => {
-    res.send('가나다다');
-  });
-
-
-
-
-
-  app.get('/articles', (req, res) => {
-    res.json(users);
-  });
-
-
-
-
-
-
-
-
-
-
+  })
+})

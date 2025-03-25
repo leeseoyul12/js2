@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f2f2f2;
+    }
+    .login-container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 300px;
+    }
+    .login-container h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .input-field {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .login-btn:hover {
+      background-color: #45a049;
+    }
+    .error {
+      color: red;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <h2>로그인</h2>
+    <form id="loginForm">
+      <input type="email" id="email" class="input-field" placeholder="이메일" required>
+      <input type="password" id="password" class="input-field" placeholder="비밀번호" required>
+      <button type="submit" class="login-btn">로그인</button>
+    </form>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function(event) {
+      event.preventDefault(); // 폼 제출 기본 동작을 막음
+
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorDiv = document.getElementById('error');
+
+      // 입력 값이 비어있는지 확인
+      if (!email || !password) {
+        errorDiv.textContent = '이메일과 비밀번호를 입력해주세요.';
+        return;
+      }
+
+      // 로그인 요청을 보낼 URL
+      const apiUrl = 'http://localhost:3000/login';
+
+      // 로그인 요청을 보내기 위한 데이터
+      const loginData = {
+        email: email,
+        password: password
+      };
+
+      // Fetch를 이용한 POST 요청
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(loginData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.token) {
+          // 토큰을 로컬스토리지에 저장
+          localStorage.setItem('token', data.token);
+          alert('로그인 성공!');
+          // 로그인 후 다른 페이지로 리다이렉트 (선택사항)
+          window.location.href = '/dashboard.html'; // 예시 페이지로 이동
+        } else {
+          errorDiv.textContent = data.error || '알 수 없는 오류 발생';
+        }
+      })
+      .catch(error => {
+        console.error('로그인 요청 중 오류 발생:', error);
+
+      
+        errorDiv.textContent = '서버 오류가 발생했습니다.';
+      });
+    });
+
+
+
+
+    
+  </script>
+
+</body>
+</html>
+
