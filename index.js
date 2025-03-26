@@ -2,20 +2,17 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 
-const secretkey = process.env.SECRET_KEY;
-
+const secretKey = process.env.SECRET_KEY; // dotenv에서 불러온 SECRET_KEY 값
 
 // cors 문제해결
 const cors = require('cors');
 app.use(cors());
 // json으로 된 post의 바디를 읽기 위해 필요
-app.use(express.json())
+app.use(express.json());
 const jwt = require('jsonwebtoken');
-const SECRET_KEY = "your_secret_key"; // 실제 서비스에선 더 복잡하고 안전하게!
 const PORT = 3000;
 
-
-
+// 인증 미들웨어에서 사용
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -36,179 +33,132 @@ function authMiddleware(req, res, next) {
   });
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-//db 연결
+// db 연결
 const sqlite3 = require('sqlite3').verbose();
-
 const db = new sqlite3.Database('./database.db');
 
 app.listen(PORT, () => {
-    console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
-  });
-  
+  console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+});
 
 
 
 
-  
-  app.post("/articles" , (req, res) => {
-    // 토큰 확인
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: "인증 토큰이 필요합니다." });
-    }
-  
-    const token = authHeader.split(' ')[1];
-    jwt.verify(token, ecretkey, (err, decoded) => {
+
+// 게시글 작성 API
+app.post("/articles", authMiddleware, (req, res) => {
+  const { title, content } = req.body;
+
+  if (!title || !content) {
+    return res.status(400).json({ error: "제목과 내용을 입력해주세요." });
+  }
+
+  const userId = req.user.id;  // 인증된 유저의 id 가져오기
+
+  db.run(
+    `INSERT INTO articles (title, content, user_id) VALUES (?, ?, ?)`, // user_id 컬럼 추가
+    [title, content, userId],
+    function (err) {
       if (err) {
-        return res.status(401).json({ error: "유효하지 않은 토큰입니다." });
+        return res.status(500).json({ error: err.message });
       }
-  
-      // 인증 성공 -> 게시글 작성 처리
-      const { title, content } = req.body;
-  
-      db.run(
-        `INSERT INTO articles (title, content) VALUES (?, ?)`,
-        [title, content],
-        function (err) {
-          if (err) {
-            return res.status(500).json({ error: err.message });
-          }
-          res.json({ id: this.lastID, title, content });
-        }
-      );
-    });
-  });
-
-// 커밋 한번해주세요
-
-// 전체 아티클 리스트 주는 api를 만들어주세요
-// GET : /articles
-
-
-
-
-//모든 사용자가 게시글 볼 수 있게 하는것
-app.get('/articles',(req, res)=>{
-
-    db.all("SELECT * FROM articles", [], (err, rows) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);  // returns the list of articles
+      res.json({
+        id: this.lastID,
+        title,
+        content,
+        user_id: userId, // 반환값에 유저 id 포함
       });
-
-})
-
-
-
-
-// 개별 아티클을 주는 api를 만들어주세요 
-// GET : /articles/:id
-app.get('/articles/:id', (req, res)=>{
-    let id = req.params.id
-
-    db.get("SELECT * FROM articles WHERE id = ?", [id], (err, row) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        if (!row) {
-            return res.status(404).json({ message: "Article not found" });
-        }
-        res.json(row);  // returns the article with the given id
-    });
-
-})
-
-// 로그인 필요
-//게시글이 본인건지 확인도 필요
-app.delete("/articles/:id", authMiddleware, (req, res)=>{
-  const id = req.params.id
+    }
+  );
+});
 
 
+
+
+
+// 전체 아티클 리스트 주는 API (유저 이메일 포함)
+app.get('/articles', (req, res) => {
+  const sql = `
+    SELECT articles.id, articles.title, articles.content, articles.created_at, users.email
+    FROM articles
+    JOIN users ON articles.user_id = users.id
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);  // returns the list of articles with user email
+  });
+});
+
+// 개별 아티클을 주는 API (유저 이메일 포함)
+app.get('/articles/:id', (req, res) => {
+  const id = req.params.id;
+  const sql = `
+    SELECT articles.id, articles.title, articles.content, articles.created_at, users.email
+    FROM articles
+    JOIN users ON articles.user_id = users.id
+    WHERE articles.id = ?
+  `;
+
+  db.get(sql, [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+    res.json(row);  // returns the article with user email
+  });
+});
+
+
+
+
+
+// 게시글 삭제 API
+app.delete("/articles/:id", authMiddleware, (req, res) => {
+  const id = req.params.id;
   const sql = 'DELETE FROM articles WHERE id = ?';
+  
   db.run(sql, id, function(err) {
     if (err) {
       console.error(err.message);
       return res.status(500).json({ error: err.message });
     }
-    // this.changes는 영향을 받은 행의 수
     res.json({ message: `총 ${this.changes}개의 아티클이 삭제되었습니다.` });
   });
+});
 
-})
+// 게시글 업데이트 API
+app.put('/articles/:id', authMiddleware, (req, res) => {
+  let id = req.params.id;
+  let { title, content } = req.body;
 
+  const sql = 'UPDATE articles SET title = ?, content = ? WHERE id = ?';
+  db.run(sql, [title, content, id], function(err) {
+    if (err) {
+      console.error('업데이트 에러:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ message: '게시글이 업데이트되었습니다.', changes: this.changes });
+  });
+});
 
-// 로그인 필요
-//게시글이 본인건지 확인도 필요
-app.put('/articles/:id',authMiddleware, (req, res)=>{
-  let id = req.params.id
-  // let title = req.body.title
-  // let content = req.body.content
-  let {title, content} = req.body
- // SQL 업데이트 쿼리 (파라미터 바인딩 사용)
- const sql = 'UPDATE articles SET title = ?, content = ? WHERE id = ?';
- db.run(sql, [title, content, id], function(err) {
-   if (err) {
-     console.error('업데이트 에러:', err.message);
-     return res.status(500).json({ error: err.message });
-   }
-   // this.changes: 영향을 받은 행의 수
-   res.json({ message: '게시글이 업데이트되었습니다.', changes: this.changes });
- });
-
-})
-
-
-
-
-
-app.get('/gettest/:id', (req, res)=>{
-
-  console.log(req.query)
-  console.log(req.params.id)
-
-
-  res.send("ok")
-})
-
-
-app.post('/posttest', (req, res)=>{
-  console.log(req.body)
-  res.send("ok")
-})
-
-
-// POST /articles/:id/comments 라우트
-//댓글 작성, 로그인 필요
-app.post("/articles/:id/comments" ,authMiddleware , (req, res) => {
+// 댓글 추가 API
+app.post("/articles/:id/comments", (req, res) => {
   const articleId = req.params.id;
   const content = req.body.content;
   
-  // 현재 날짜/시간을 ISO 문자열 형태로 생성
   const createdAt = new Date().toISOString();
-
-  // comments 테이블에 INSERT 쿼리 실행
   const sql = `INSERT INTO comments (content, created_at, article_id) VALUES (?, ?, ?)`;
+  
   db.run(sql, [content, createdAt, articleId], function(err) {
     if (err) {
       console.error("댓글 삽입 중 에러 발생:", err);
       return res.status(500).json({ error: "댓글을 등록하는데 실패했습니다." });
     }
-
-    // 삽입된 댓글의 id는 this.lastID에 저장됨.
     res.status(201).json({
       id: this.lastID,
       content: content,
@@ -220,10 +170,9 @@ app.post("/articles/:id/comments" ,authMiddleware , (req, res) => {
 
 
 
+// 회원가입 API
 const bcrypt = require('bcrypt');
-const saltRounds = 10; // 일반적으로 10이면 충분함
-//로그인 불필요요
-//회원가입입
+const saltRounds = 10;
 app.post('/users', (req, res) => {
   const { email, password } = req.body;
 
@@ -231,7 +180,6 @@ app.post('/users', (req, res) => {
     return res.status(400).send("Email and password are required.");
   }
 
-  // 비밀번호 해싱
   bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
     if (err) {
       return res.status(500).send("Error hashing password");
@@ -254,7 +202,8 @@ app.post('/users', (req, res) => {
     });
   });
 });
-//로그인 불필요, 안되어있어야 한다, 로그인인
+
+// 로그인 API
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
 
@@ -273,9 +222,6 @@ app.post('/login', (req, res) => {
       return res.status(404).send("이메일이 없습니다");
     }
 
-
-
-    // 비밀번호 비교
     bcrypt.compare(password, user.password, (err, result) => {
       if (err) {
         return res.status(500).send("비밀번호 확인 중 오류 발생");
@@ -285,14 +231,12 @@ app.post('/login', (req, res) => {
         return res.status(401).send("패스워드가 틀립니다");
       }
 
-      // JWT 토큰 생성
       const token = jwt.sign(
         { id: user.id, email: user.email }, // payload
-        ecretkey,                         // 비밀 키
+        secretKey,                          // 비밀 키
         { expiresIn: '1h' }                 // 옵션: 1시간 유효
       );
 
-      // 성공 응답
       res.send({
         message: "로그인 성공!",
         token: token
@@ -301,22 +245,57 @@ app.post('/login', (req, res) => {
   });
 });
 
+// 서버 시작 시 테이블이 없으면 생성
+db.serialize(() => {
+  // users 테이블이 없으면 생성
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL
+    );
+  `);
 
+  // articles 테이블이 없으면 생성
+  db.run(`
+    CREATE TABLE IF NOT EXISTS articles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL
+    );
+  `);
 
-
-app.get('/logintest', (req, res)=>{
-  console.log(req.headers.authorization.split(' ')[1])
-  let token = req.headers.authorization.split(' ')[1]
-
-
-  jwt.verify(token, ecretkey, (err, decoded)=>{
-    if(err){
-      return res.send("에러!!!")
+  // articles 테이블에 user_id 컬럼이 없다면 추가
+  // ALTER TABLE은 테이블이 이미 존재하는 경우에만 실행
+  db.get('PRAGMA table_info(articles);', (err, columns) => {
+    if (err) {
+      console.error("테이블 정보 조회 실패:", err);
+      return;
     }
 
-    return res.send('로그인 성공!')
+    // user_id 컬럼이 없으면 추가
+    const hasUserId = columns.some(col => col.name === 'user_id');
+    if (!hasUserId) {
+      db.run(`
+        ALTER TABLE articles ADD COLUMN user_id INTEGER;
+      `, (err) => {
+        if (err) {
+          console.error("user_id 컬럼 추가 실패:", err);
+        } else {
+          console.log("user_id 컬럼이 성공적으로 추가되었습니다.");
+        }
+      });
+    }
+  });
 
-  })
-})
-
-
+  // comments 테이블이 없으면 생성
+  db.run(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      article_id INTEGER NOT NULL,
+      FOREIGN KEY (article_id) REFERENCES articles(id)
+    );
+  `);
+});
