@@ -1,5 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const app = express();
+
+const secretkey = process.env.SECRET_KEY;
+
+
 // cors 문제해결
 const cors = require('cors');
 app.use(cors());
@@ -8,6 +13,41 @@ app.use(express.json())
 const jwt = require('jsonwebtoken');
 const SECRET_KEY = "your_secret_key"; // 실제 서비스에선 더 복잡하고 안전하게!
 const PORT = 3000;
+
+
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).send('인증 헤더 없음');
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) {
+      return res.status(401).send('토큰 검증 실패');
+    }
+
+    // 인증 성공 시 decoded 안에 있는 사용자 정보 req에 저장
+    req.user = decoded;
+    next(); // 다음 미들웨어 or 라우터로
+  });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //db 연결
 const sqlite3 = require('sqlite3').verbose();
@@ -18,7 +58,12 @@ app.listen(PORT, () => {
     console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
   });
   
-  app.post("/articles", (req, res) => {
+
+
+
+
+  
+  app.post("/articles" , (req, res) => {
     // 토큰 확인
     const authHeader = req.headers.authorization;
     if (!authHeader) {
@@ -26,7 +71,7 @@ app.listen(PORT, () => {
     }
   
     const token = authHeader.split(' ')[1];
-    jwt.verify(token, SECRET_KEY, (err, decoded) => {
+    jwt.verify(token, ecretkey, (err, decoded) => {
       if (err) {
         return res.status(401).json({ error: "유효하지 않은 토큰입니다." });
       }
@@ -52,6 +97,10 @@ app.listen(PORT, () => {
 // 전체 아티클 리스트 주는 api를 만들어주세요
 // GET : /articles
 
+
+
+
+//모든 사용자가 게시글 볼 수 있게 하는것
 app.get('/articles',(req, res)=>{
 
     db.all("SELECT * FROM articles", [], (err, rows) => {
@@ -62,6 +111,9 @@ app.get('/articles',(req, res)=>{
       });
 
 })
+
+
+
 
 // 개별 아티클을 주는 api를 만들어주세요 
 // GET : /articles/:id
@@ -80,8 +132,9 @@ app.get('/articles/:id', (req, res)=>{
 
 })
 
-
-app.delete("/articles/:id", (req, res)=>{
+// 로그인 필요
+//게시글이 본인건지 확인도 필요
+app.delete("/articles/:id", authMiddleware, (req, res)=>{
   const id = req.params.id
 
 
@@ -97,7 +150,10 @@ app.delete("/articles/:id", (req, res)=>{
 
 })
 
-app.put('/articles/:id', (req, res)=>{
+
+// 로그인 필요
+//게시글이 본인건지 확인도 필요
+app.put('/articles/:id',authMiddleware, (req, res)=>{
   let id = req.params.id
   // let title = req.body.title
   // let content = req.body.content
@@ -136,7 +192,8 @@ app.post('/posttest', (req, res)=>{
 
 
 // POST /articles/:id/comments 라우트
-app.post("/articles/:id/comments", (req, res) => {
+//댓글 작성, 로그인 필요
+app.post("/articles/:id/comments" ,authMiddleware , (req, res) => {
   const articleId = req.params.id;
   const content = req.body.content;
   
@@ -165,7 +222,8 @@ app.post("/articles/:id/comments", (req, res) => {
 
 const bcrypt = require('bcrypt');
 const saltRounds = 10; // 일반적으로 10이면 충분함
-
+//로그인 불필요요
+//회원가입입
 app.post('/users', (req, res) => {
   const { email, password } = req.body;
 
@@ -196,7 +254,7 @@ app.post('/users', (req, res) => {
     });
   });
 });
-
+//로그인 불필요, 안되어있어야 한다, 로그인인
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
 
@@ -215,6 +273,8 @@ app.post('/login', (req, res) => {
       return res.status(404).send("이메일이 없습니다");
     }
 
+
+
     // 비밀번호 비교
     bcrypt.compare(password, user.password, (err, result) => {
       if (err) {
@@ -228,7 +288,7 @@ app.post('/login', (req, res) => {
       // JWT 토큰 생성
       const token = jwt.sign(
         { id: user.id, email: user.email }, // payload
-        SECRET_KEY,                         // 비밀 키
+        ecretkey,                         // 비밀 키
         { expiresIn: '1h' }                 // 옵션: 1시간 유효
       );
 
@@ -241,12 +301,15 @@ app.post('/login', (req, res) => {
   });
 });
 
+
+
+
 app.get('/logintest', (req, res)=>{
   console.log(req.headers.authorization.split(' ')[1])
   let token = req.headers.authorization.split(' ')[1]
 
 
-  jwt.verify(token, SECRET_KEY, (err, decoded)=>{
+  jwt.verify(token, ecretkey, (err, decoded)=>{
     if(err){
       return res.send("에러!!!")
     }
@@ -255,3 +318,5 @@ app.get('/logintest', (req, res)=>{
 
   })
 })
+
+
