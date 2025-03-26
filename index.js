@@ -244,8 +244,6 @@ app.post('/login', (req, res) => {
     });
   });
 });
-
-// 서버 시작 시 테이블이 없으면 생성
 db.serialize(() => {
   // users 테이블이 없으면 생성
   db.run(`
@@ -264,29 +262,6 @@ db.serialize(() => {
       content TEXT NOT NULL
     );
   `);
-
-  // articles 테이블에 user_id 컬럼이 없다면 추가
-  // ALTER TABLE은 테이블이 이미 존재하는 경우에만 실행
-  db.get('PRAGMA table_info(articles);', (err, columns) => {
-    if (err) {
-      console.error("테이블 정보 조회 실패:", err);
-      return;
-    }
-
-    // user_id 컬럼이 없으면 추가
-    const hasUserId = columns.some(col => col.name === 'user_id');
-    if (!hasUserId) {
-      db.run(`
-        ALTER TABLE articles ADD COLUMN user_id INTEGER;
-      `, (err) => {
-        if (err) {
-          console.error("user_id 컬럼 추가 실패:", err);
-        } else {
-          console.log("user_id 컬럼이 성공적으로 추가되었습니다.");
-        }
-      });
-    }
-  });
 
   // comments 테이블이 없으면 생성
   db.run(`
